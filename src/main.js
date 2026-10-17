@@ -1,3 +1,6 @@
+// Enhanced main.js for Code World — Boss fight, improved UI, pause/menu, richer procedural pixel assets,
+// multiplayer sync via Socket.IO (client-side). Generates pixel textures at runtime for placeholders.
+
 const config = {
   type: Phaser.AUTO,
   parent: 'game-root',
@@ -5,14 +8,12 @@ const config = {
   height: 540,
   backgroundColor: '#07111a',
   pixelArt: true,
-  scene: null,
+  roundPixels: true,
   physics: {
     default: 'arcade',
-    arcade: {
-      gravity: { y: 0 },
-      debug: false,
-    },
+    arcade: { gravity: { y: 0 }, debug: false }
   },
+  scene: []
 };
 
 const GAME = {
@@ -23,209 +24,119 @@ const GAME = {
     { code: 'PY', color: 0x5ad1ff },
     { code: 'C++', color: 0x60a5fa },
     { code: 'RS', color: 0xf97316 },
-    { code: 'HTML', color: 0xf97316 },
-    { code: 'CSS', color: 0x60a5fa },
-    { code: 'SQL', color: 0x34d399 },
-    { code: 'GO', color: 0x22d3ee },
-    { code: 'JAVA', color: 0xf59e0b },
-  ],
+    { code: 'HTML', color: 0xf06529 },
+    { code: 'CSS', color: 0x2965f1 },
+    { code: 'SQL', color: 0x00b894 },
+    { code: 'GO', color: 0x00add8 },
+    { code: 'JAVA', color: 0xed8b00 }
+  ]
 };
 
-class BootScene extends Phaser.Scene {
-  constructor() {
-    super('BootScene');
+class PreloadScene extends Phaser.Scene {
+  constructor() { super('PreloadScene'); }
+  preload() {
+    // No external files required — generate procedural pixel art during create
+    this.load.image('pixel', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AAn8B9uQJgQAAAABJRU5ErkJggg==');
   }
-
   create() {
     this.scene.start('TitleScene');
   }
 }
 
 class TitleScene extends Phaser.Scene {
-  constructor() {
-    super('TitleScene');
-  }
-
+  constructor() { super('TitleScene'); }
   create() {
     this.cameras.main.setBackgroundColor('#07111a');
+    // create polished title elements
+    this.add.text(GAME.width/2, 90, 'CODE WORLD', { fontFamily:'monospace', fontSize: '56px', color: '#a5f3fc' }).setOrigin(0.5);
+    this.add.text(GAME.width/2, 160, 'A pixel‑art roguelike shooter — collect languages and beat the boss', { fontFamily:'monospace', fontSize:'16px', color:'#dfeeff' }).setOrigin(0.5);
 
-    const title = this.add.text(config.width / 2, 140, 'CODE WORLD', {
-      fontFamily: 'monospace',
-      fontSize: '46px',
-      color: '#a5f3fc',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5);
+    const play = this.add.rectangle(GAME.width/2, 260, 260, 68, 0x1f9dff).setInteractive();
+    const playT = this.add.text(GAME.width/2, 260, 'Start Single Player', { fontFamily:'monospace', fontSize:'22px', color:'#03111c' }).setOrigin(0.5);
+    play.on('pointerdown', () => this.scene.start('GameScene'));
 
-    const subtitle = this.add.text(config.width / 2, 200, 'Collect every language. Survive the chaos.', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#dfeeff',
-    }).setOrigin(0.5);
+    const mpBtn = this.add.rectangle(GAME.width/2, 340, 260, 52, 0xffd66b).setInteractive();
+    const mpT = this.add.text(GAME.width/2, 340, 'Start Multiplayer (local server)', { fontFamily:'monospace', fontSize:'18px', color:'#03111c' }).setOrigin(0.5);
+    mpBtn.on('pointerdown', () => this.scene.start('GameScene', { multiplayer: true }));
 
-    const playButton = this.add.rectangle(config.width / 2, 320, 220, 60, 0x1f9dff, 0.95);
-    const playText = this.add.text(config.width / 2, 320, 'START GAME', {
-      fontFamily: 'monospace',
-      fontSize: '22px',
-      color: '#03111c',
-      fontStyle: 'bold',
-    }).setOrigin(0.5);
+    const settings = this.add.text(GAME.width/2, 420, 'Toggle Music • Toggle 16/32px sprites later in options', { fontFamily:'monospace', fontSize:'14px', color:'#9ec7ff' }).setOrigin(0.5);
 
-    playButton.setInteractive();
-    playButton.on('pointerdown', () => {
-      this.scene.start('GameScene');
-    });
+    // quick credits
+    this.add.text(18, GAME.height - 36, 'Engine: Phaser 3 • Server: Socket.IO', { fontFamily:'monospace', fontSize:'12px', color:'#8faefc' });
+  }
+}
 
-    this.add.text(config.width / 2, 420, 'Move: WASD / Arrow Keys • Fire: Space', {
-      fontFamily: 'monospace',
-      fontSize: '16px',
-      color: '#d7e7ff',
-    }).setOrigin(0.5);
-
-    this.add.text(config.width / 2, 470, 'Single-player + multiplayer-ready server included', {
-      fontFamily: 'monospace',
-      fontSize: '14px',
-      color: '#9ec7ff',
-    }).setOrigin(0.5);
-
-    title.setShadow(0, 0, '#000', 0);
-    subtitle.setShadow(0, 0, '#000', 0);
-    playText.setShadow(0, 0, '#000', 0);
+class PauseScene extends Phaser.Scene {
+  constructor() { super('PauseScene'); }
+  create() {
+    const { width, height } = this.scale;
+    this.bg = this.add.rectangle(width/2, height/2, width, height, 0x000000, 0.45);
+    this.box = this.add.rectangle(width/2, height/2, 420, 220, 0x081820).setStrokeStyle(2, 0xffffff, 0.06);
+    this.add.text(width/2, height/2 - 40, 'PAUSED', { fontFamily:'monospace', fontSize:'36px', color:'#eaf2ff' }).setOrigin(0.5);
+    const resume = this.add.text(width/2, height/2 + 20, 'Resume', { fontFamily:'monospace', fontSize:'20px', color:'#9ae6b4' }).setOrigin(0.5).setInteractive();
+    const quit = this.add.text(width/2, height/2 + 60, 'Quit to Title', { fontFamily:'monospace', fontSize:'16px', color:'#ffb3b3' }).setOrigin(0.5).setInteractive();
+    resume.on('pointerdown', () => { this.scene.stop(); this.scene.resume('GameScene'); });
+    quit.on('pointerdown', () => { this.scene.stop('GameScene'); this.scene.start('TitleScene'); });
   }
 }
 
 class GameScene extends Phaser.Scene {
-  constructor() {
-    super('GameScene');
-    this.player = null;
-    this.cursors = null;
-    this.pickups = null;
-    this.enemies = null;
-    this.bullets = null;
-    this.scoreText = null;
-    this.healthText = null;
-    this.timeText = null;
-    this.foundText = null;
-    this.waveText = null;
-    this.gameOver = false;
-    this.timeLeft = 60;
-    this.score = 0;
-    this.found = new Set();
-    this.wave = 1;
-    this.spawnTimer = 0;
-    this.boss = null;
-    this.bossHp = 0;
-    this.bossMaxHp = 0;
-    this.socket = null;
-  }
+  constructor() { super('GameScene'); this.player = null; this.cursors = null; this.pickups = null; this.enemies = null; this.bullets = null; this.otherPlayers = new Map(); this.socket = null; }
+
+  init(data) { this.options = data || {}; }
 
   create() {
-    this.createTextures();
-    this.createBackground();
+    this.createProceduralArt();
+    this.createWorld();
     this.createPlayer();
     this.createGroups();
-    this.createHud();
     this.createInput();
+    this.createHud();
     this.createAudio();
-    this.createNetwork();
-    this.spawnPickupWave();
-    this.spawnWave();
+    this.createBoss();
+    if (this.options.multiplayer) this.setupNetwork();
+
+    this.timeLeft = 120; // more time for boss encounter
+    this.wave = 1;
+    this.spawnEnemyWave(this.wave);
   }
 
-  createAudio() {
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    this.musicSeq = 0;
-    this.musicTimer = this.time.addEvent({
-      delay: 280,
-      callback: () => {
-        if (!this.gameOver) {
-          const notes = [220, 277, 330, 415, 330, 277, 220];
-          const n = notes[this.musicSeq % notes.length];
-          this.playTone(n, 0.08, 'square', 0.03);
-          this.musicSeq += 1;
-        }
-      },
-      loop: true,
-    });
-  }
-
-  createNetwork() {
-    try {
-      const socket = io();
-      this.socket = socket;
-      socket.emit('hello', { type: 'game' });
-      socket.on('playerState', (state) => {
-        if (state && state.id !== this.socket.id) {
-          // Multiplayer hook for future expansion: remote clients can be visualized later.
-        }
-      });
-    } catch (error) {
-      // Single-player fallback if Socket.IO is not available.
-    }
-  }
-
-  createTextures() {
-    const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-
-    // Player
-    graphics.clear();
-    graphics.fillStyle(0x7ad7ff, 1);
-    graphics.fillRect(0, 0, 16, 16);
-    graphics.fillStyle(0x041b2a, 1);
-    graphics.fillRect(4, 5, 2, 2);
-    graphics.fillRect(10, 5, 2, 2);
-    graphics.fillRect(5, 10, 6, 2);
-    graphics.generateTexture('player', 16, 16);
-
-    // Enemy
-    graphics.clear();
-    graphics.fillStyle(0xff6b6b, 1);
-    graphics.fillRect(0, 0, 16, 16);
-    graphics.fillStyle(0x490b11, 1);
-    graphics.fillRect(3, 4, 10, 8);
-    graphics.generateTexture('enemy', 16, 16);
-
-    // Bullet
-    graphics.clear();
-    graphics.fillStyle(0xe0f2fe, 1);
-    graphics.fillRect(0, 0, 6, 6);
-    graphics.generateTexture('bullet', 6, 6);
-
-    // Pickup
+  createProceduralArt() {
+    const g = this.make.graphics({ add: false });
+    // player 16x16 variant
+    g.clear();
+    g.fillStyle(0x7ad7ff, 1); g.fillRect(0,0,16,16);
+    g.fillStyle(0x041b2a,1); g.fillRect(4,5,2,2); g.fillRect(10,5,2,2); g.fillRect(5,10,6,2);
+    g.generateTexture('pl16',16,16);
+    // enemy 16
+    g.clear(); g.fillStyle(0xff6b6b,1); g.fillRect(0,0,16,16); g.fillStyle(0x490b11,1); g.fillRect(3,4,10,8); g.generateTexture('en16',16,16);
+    // pickup 20x20 per language
     for (const lang of GAME.languages) {
-      graphics.clear();
-      graphics.fillStyle(lang.color, 1);
-      graphics.fillRect(0, 0, 20, 20);
-      graphics.fillStyle(0x07111a, 1);
-      graphics.fillRect(4, 4, 12, 12);
-      graphics.lineStyle(2, 0xffffff, 1);
-      graphics.strokeRect(3, 3, 14, 14);
-      graphics.generateTexture(`pickup-${lang.code}`, 20, 20);
+      g.clear();
+      g.fillStyle(lang.color, 1); g.fillRect(0,0,20,20);
+      g.fillStyle(0x07111a,1); g.fillRect(4,4,12,12);
+      g.lineStyle(2, 0xffffff, 1); g.strokeRect(3,3,14,14);
+      g.generateTexture(`pickup-${lang.code}`, 20, 20);
     }
-
-    graphics.destroy();
+    // bullet
+    g.clear(); g.fillStyle(0xe0f2fe,1); g.fillRect(0,0,6,6); g.generateTexture('bullet',6,6);
+    g.destroy();
   }
 
-  createBackground() {
-    const grid = this.add.graphics();
-    grid.lineStyle(1, 0x1d2d3b, 1);
-    for (let x = 0; x <= config.width; x += 32) {
-      grid.moveTo(x, 0);
-      grid.lineTo(x, config.height);
-    }
-    for (let y = 0; y <= config.height; y += 32) {
-      grid.moveTo(0, y);
-      grid.lineTo(config.width, y);
-    }
+  createWorld() { // subtle grid background
+    const grid = this.add.graphics(); grid.lineStyle(1, 0x1d2d3b, 1);
+    for (let x = 0; x <= config.width; x += 32) { grid.moveTo(x, 0); grid.lineTo(x, config.height); }
+    for (let y = 0; y <= config.height; y += 32) { grid.moveTo(0, y); grid.lineTo(config.width, y); }
     grid.strokePath();
   }
 
   createPlayer() {
-    this.player = this.physics.add.sprite(config.width / 2, config.height - 60, 'player');
-    this.player.setCollideWorldBounds(true);
+    this.player = this.physics.add.sprite(GAME.width/2, GAME.height - 80, 'pl16');
     this.player.setScale(2);
-    this.player.body.setSize(12, 12);
-    this.player.health = 100;
+    this.player.setCollideWorldBounds(true);
+    this.player.health = 150;
+    this.player.score = 0;
+    this.player.id = Phaser.Math.RND.uuid();
   }
 
   createGroups() {
@@ -233,234 +144,221 @@ class GameScene extends Phaser.Scene {
     this.enemies = this.physics.add.group();
     this.bullets = this.physics.add.group();
 
-    this.physics.add.overlap(this.player, this.pickups, this.collectPickup, null, this);
-    this.physics.add.overlap(this.player, this.enemies, this.hitEnemy, null, this);
-    this.physics.add.overlap(this.bullets, this.enemies, this.bulletHitEnemy, null, this);
-  }
+    // create pickups
+    let i = 0;
+    for (const lang of GAME.languages) {
+      const x = 80 + (i%3)*320/1.15; const y = 90 + Math.floor(i/3)*120; i++;
+      const p = this.physics.add.image(x, y, `pickup-${lang.code}`);
+      p.lang = lang; p.collected = false; p.setImmovable(true); p.setScale(1.1);
+      this.pickups.add(p);
+    }
 
-  createHud() {
-    this.foundText = this.add.text(18, 18, 'Found: 0 / 9', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#dfeeff',
-    });
-
-    this.healthText = this.add.text(18, 42, 'HP: 100', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#9ae6b4',
-    });
-
-    this.timeText = this.add.text(config.width - 120, 18, '60s', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#fef3c7',
-    });
-
-    this.scoreText = this.add.text(config.width - 180, 42, 'Score: 0', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#dbeafe',
-    });
-
-    this.waveText = this.add.text(config.width / 2, 18, 'Wave 1', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#c4b5fd',
-    }).setOrigin(0.5);
+    // collisions
+    this.physics.add.overlap(this.player, this.pickups, this.onCollectPickup, null, this);
+    this.physics.add.overlap(this.player, this.enemies, this.onPlayerHit, null, this);
+    this.physics.add.overlap(this.bullets, this.enemies, this.onBulletHitEnemy, null, this);
   }
 
   createInput() {
-    this.cursors = this.input.keyboard.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      right: Phaser.Input.Keyboard.KeyCodes.D,
-      fire: Phaser.Input.Keyboard.KeyCodes.SPACE,
-    });
-
-    this.input.keyboard.on('keydown-SPACE', () => {
-      if (!this.gameOver) {
-        this.fireBullet();
-      }
-    });
+    this.cursors = this.input.keyboard.addKeys({ up: 'W', down: 'S', left: 'A', right: 'D', fire: 'SPACE', pause: 'ESC' });
+    this.input.keyboard.on('keydown-ESC', () => { this.scene.launch('PauseScene'); this.scene.pause(); });
+    this.input.keyboard.on('keydown-SPACE', () => { if (!this.gameOver) this.fireBullet(); });
   }
 
-  spawnPickupWave() {
-    for (let i = 0; i < GAME.languages.length; i++) {
-      const lang = GAME.languages[i];
-      const pickup = this.physics.add.sprite(80 + (i % 3) * 220, 100 + Math.floor(i / 3) * 120, `pickup-${lang.code}`);
-      pickup.setScale(1.2);
-      pickup.lang = lang;
-      pickup.setDepth(2);
-      pickup.body.setAllowGravity(false);
-      this.pickups.add(pickup);
+  createHud() {
+    this.found = new Set();
+    this.foundText = this.add.text(18, 18, 'Found: 0 / ' + GAME.languages.length, { fontFamily:'monospace', fontSize: '18px', color:'#dfeeff' });
+    this.healthText = this.add.text(18, 42, 'HP: ' + this.player.health, { fontFamily:'monospace', fontSize:'18px', color:'#9ae6b4' });
+    this.scoreText = this.add.text(GAME.width - 180, 18, 'Score: 0', { fontFamily:'monospace', fontSize:'18px', color:'#dbeafe' });
+    this.timeText = this.add.text(GAME.width - 120, 42, '120s', { fontFamily:'monospace', fontSize:'18px', color:'#fef3c7' });
+    this.waveText = this.add.text(GAME.width/2, 18, 'Wave ' + this.wave, { fontFamily:'monospace', fontSize:'18px', color:'#c4b5fd' }).setOrigin(0.5);
+
+    // boss bar (hidden initially)
+    this.bossBarBg = this.add.rectangle(GAME.width/2, 520, 420, 14, 0x000000, 0.6).setVisible(false).setOrigin(0.5);
+    this.bossBar = this.add.rectangle(GAME.width/2 - 210, 520, 0, 10, 0xff6b6b).setVisible(false).setOrigin(0,0.5);
+  }
+
+  createAudio() {
+    // lightweight WebAudio synth for music + SFX
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.masterGain = this.ctx.createGain(); this.masterGain.gain.value = 0.14; this.masterGain.connect(this.ctx.destination);
+    this.isMusicOn = true;
+    // simple background pattern
+    this.bgStep = 0; this.bgTimer = 0;
+  }
+
+  playSfx(freq=440, dur=0.09, type='square', vol=0.08) {
+    try {
+      const o = this.ctx.createOscillator(); const g = this.ctx.createGain();
+      o.type = type; o.frequency.value = freq; g.gain.value = vol; o.connect(g); g.connect(this.masterGain);
+      o.start(); o.stop(this.ctx.currentTime + dur);
+      g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+    } catch (e) { /* Audio unavailable */ }
+  }
+
+  createBoss() {
+    // boss is not present until wave threshold reached
+    this.boss = null;
+  }
+
+  spawnEnemyWave(waveCount=1) {
+    const base = 3 + waveCount * 2;
+    for (let i = 0; i < base; i++) {
+      const x = Phaser.Math.Between(40, GAME.width - 40);
+      const y = Phaser.Math.Between(-120, -20);
+      const e = this.physics.add.sprite(x, y, 'en16');
+      e.setScale(1.6);
+      e.health = 1 + Math.floor(waveCount/2);
+      e.setData('speed', 30 + waveCount * 8);
+      this.enemies.add(e);
     }
   }
 
-  spawnWave() {
-    const enemyCount = 3 + this.wave * 2;
-    for (let i = 0; i < enemyCount; i++) {
-      const x = Phaser.Math.Between(40, config.width - 40);
-      const y = Phaser.Math.Between(-100, 0);
-      const enemy = this.physics.add.sprite(x, y, 'enemy');
-      enemy.setScale(1.8);
-      enemy.setVelocity(Phaser.Math.Between(-30, 30), 40 + this.wave * 6);
-      enemy.health = 1;
-      this.enemies.add(enemy);
+  spawnBoss() {
+    if (this.boss) return;
+    const b = this.physics.add.sprite(GAME.width/2, -80, 'en16');
+    b.setScale(6,4);
+    b.health = 180;
+    b.maxHealth = 180;
+    b.phase = 0;
+    b.attackTimer = 0;
+    b.setImmovable(true);
+    this.boss = b; this.add.existing(b);
+    // show boss UI
+    this.bossBarBg.setVisible(true); this.bossBar.setVisible(true);
+  }
+
+  onCollectPickup(player, pickup) {
+    if (pickup.collected) return;
+    pickup.collected = true;
+    this.playSfx(880, 0.06, 'triangle', 0.06);
+    this.found.add(pickup.lang.code);
+    pickup.destroy();
+    this.player.score += 100;
+    if (this.found.size >= GAME.languages.length) {
+      // trigger boss
+      this.spawnBoss();
     }
-    this.waveText.setText(`Wave ${this.wave}`);
+    this.updateHud();
+    // multiplayer notify
+    if (this.socket) this.socket.emit('pickup', { code: pickup.lang.code });
+  }
+
+  onPlayerHit(player, enemy) {
+    enemy.destroy(); this.player.health -= 20; this.playSfx(120, 0.08, 'sawtooth', 0.05); if (this.player.health <= 0) this.onGameOver(); this.updateHud();
+  }
+
+  onBulletHitEnemy(bullet, enemy) {
+    bullet.destroy(); enemy.health -= 1; if (enemy.health <= 0) { enemy.destroy(); this.player.score += 15; this.playSfx(420,0.04,'square',0.03); }
   }
 
   fireBullet() {
-    const bullet = this.physics.add.sprite(this.player.x, this.player.y - 12, 'bullet');
-    bullet.setDepth(3);
-    bullet.setVelocity(0, -420);
-    bullet.damage = 1;
-    bullet.setScale(1.4);
-    bullet.setCollideWorldBounds(false);
-    this.bullets.add(bullet);
-    this.playTone(620, 0.05, 'square', 0.03);
+    const b = this.physics.add.image(this.player.x, this.player.y - 18, 'bullet'); b.setVelocity(0, -520); b.damage = 1; this.bullets.add(b); this.playSfx(760, 0.03, 'square', 0.04);
   }
 
-  collectPickup(player, pickup) {
-    if (this.found.has(pickup.lang.code)) return;
-
-    this.found.add(pickup.lang.code);
-    this.score += 100;
-    this.playTone(780, 0.08, 'triangle', 0.035);
-    pickup.destroy();
-
-    if (this.found.size >= GAME.languages.length) {
-      this.finishGame(true);
-    }
-
-    this.updateHud();
-  }
-
-  hitEnemy(player, enemy) {
-    if (this.gameOver) return;
-
-    enemy.destroy();
-    this.player.health -= 20;
-    this.playTone(120, 0.08, 'sawtooth', 0.04);
-
-    if (this.player.health <= 0) {
-      this.player.health = 0;
-      this.finishGame(false);
-    }
-
-    this.updateHud();
-  }
-
-  bulletHitEnemy(bullet, enemy) {
-    bullet.destroy();
-    enemy.destroy();
-    this.score += 15;
-    this.playTone(440, 0.04, 'square', 0.02);
-    this.updateHud();
-  }
-
-  updateHud() {
-    this.foundText.setText(`Found: ${this.found.size} / ${GAME.languages.length}`);
-    this.healthText.setText(`HP: ${Math.max(0, this.player.health)}`);
-    this.timeText.setText(`${Math.max(0, Math.ceil(this.timeLeft))}s`);
-    this.scoreText.setText(`Score: ${this.score}`);
-  }
-
-  finishGame(win) {
-    this.gameOver = true;
-    this.physics.pause();
-
-    this.cameras.main.flash(220, 0, 255, 0);
-
-    const message = win ? 'WORLD COMPLETE!' : 'GAME OVER';
-    const color = win ? '#9ae6b4' : '#fca5a5';
-
-    this.add.text(config.width / 2, config.height / 2, message, {
-      fontFamily: 'monospace',
-      fontSize: '42px',
-      color,
-      stroke: '#000000',
-      strokeThickness: 6,
-    }).setOrigin(0.5);
-
-    this.add.text(config.width / 2, config.height / 2 + 48, `Final Score: ${this.score}`, {
-      fontFamily: 'monospace',
-      fontSize: '22px',
-      color: '#e8f6ff',
-    }).setOrigin(0.5);
-
-    this.time.delayedCall(1800, () => {
-      this.scene.start('TitleScene');
-    });
-  }
-
-  playTone(frequency, duration = 0.08, type = 'square', gainValue = 0.03) {
-    const ctx = this.audioContext;
-    if (!ctx) return;
-
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    oscillator.type = type;
-    oscillator.frequency.value = frequency;
-    gainNode.gain.value = gainValue;
-
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + duration);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-  }
+  updateHud() { this.foundText.setText(`Found: ${this.found.size} / ${GAME.languages.length}`); this.healthText.setText('HP: ' + Math.max(0, Math.round(this.player.health))); this.scoreText.setText('Score: ' + this.player.score); }
 
   update(time, delta) {
     if (this.gameOver) return;
-
-    this.timeLeft -= delta / 1000;
-    if (this.timeLeft <= 0) {
-      this.timeLeft = 0;
-      this.finishGame(false);
+    const dt = delta/1000;
+    // music synth pattern
+    this.bgTimer += dt;
+    if (this.isMusicOn && this.bgTimer > 0.28) {
+      this.bgTimer = 0; this.bgStep = (this.bgStep + 1) % 8; const freq = 220 * (1 + (this.bgStep%4)*0.12); this.playSfx(freq, 0.1, 'sine', 0.02);
     }
 
-    const speed = 180;
-    const moveX = (this.cursors.right.isDown ? 1 : 0) - (this.cursors.left.isDown ? 1 : 0);
-    const moveY = (this.cursors.down.isDown ? 1 : 0) - (this.cursors.up.isDown ? 1 : 0);
+    this.timeLeft -= dt; if (this.timeLeft <= 0) { this.timeLeft = 0; this.onGameOver(); }
+    // movement
+    const speed = 220; let vx = 0, vy = 0;
+    if (this.cursors.left.isDown) vx -= 1; if (this.cursors.right.isDown) vx += 1; if (this.cursors.up.isDown) vy -= 1; if (this.cursors.down.isDown) vy += 1;
+    const mag = Math.hypot(vx, vy) || 1; this.player.setVelocity((vx/mag)*speed, (vy/mag)*speed);
 
-    if (moveX !== 0 || moveY !== 0) {
-      const length = Math.hypot(moveX, moveY) || 1;
-      this.player.setVelocity((moveX / length) * speed, (moveY / length) * speed);
-    } else {
-      this.player.setVelocity(0, 0);
-    }
+    // enemies homing
+    this.enemies.getChildren().forEach((e) => {
+      const angle = Phaser.Math.Angle.Between(e.x, e.y, this.player.x, this.player.y);
+      const spd = e.getData('speed') || 50;
+      e.setVelocity(Math.cos(angle)*spd, Math.sin(angle)*spd);
+    });
 
-    this.enemies.getChildren().forEach((enemy) => {
-      if (!enemy.active) return;
+    // bullets cleanup
+    this.bullets.getChildren().forEach((b) => { if (b.y < -20) b.destroy(); });
 
-      const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.player.x, this.player.y);
-      const velocity = 35 + this.wave * 8;
-      enemy.setVelocity(Math.cos(angle) * velocity, Math.sin(angle) * velocity);
+    // spawn new waves if cleared
+    if (this.enemies.countActive() === 0 && !this.boss) { this.wave++; this.spawnEnemyWave(this.wave); this.waveText.setText('Wave ' + this.wave); }
 
-      if (enemy.y > config.height + 40 || enemy.x < -40 || enemy.x > config.width + 40) {
-        enemy.destroy();
+    // boss behavior
+    if (this.boss) {
+      if (this.boss.y < 120) { this.boss.setVelocity(0, 60); } else { this.boss.setVelocity(0,0); }
+      // phase transitions
+      const hpRatio = this.boss.health / this.boss.maxHealth;
+      if (hpRatio < 0.6 && this.boss.phase < 1) this.boss.phase = 1;
+      if (hpRatio < 0.25 && this.boss.phase < 2) this.boss.phase = 2;
+      this.boss.attackTimer -= dt;
+      if (this.boss.attackTimer <= 0 && this.boss.y >= 120) {
+        this.boss.attackTimer = this.boss.phase === 2 ? 0.45 : this.boss.phase === 1 ? 0.9 : 1.6;
+        // telegraphed spread attacks
+        const shots = this.boss.phase === 2 ? 12 : this.boss.phase === 1 ? 7 : 4;
+        const center = this.boss;
+        for (let i=0;i<shots;i++) {
+          const t = i/(shots-1) - 0.5; const angle = t * Math.PI * 0.9; const vx = Math.sin(angle)*220; const vy = Math.cos(angle)*220;
+          const proj = this.physics.add.image(center.x, center.y + 30, 'bullet'); proj.setVelocity(vx, vy); proj.setTint(0xffb3b3); proj.isEnemy = true; this.bullets.add(proj);
+        }
+        this.playSfx(160, 0.18, 'sawtooth', 0.06);
       }
-    });
+      // boss hurt by player's bullets
+      this.physics.overlap(this.bullets, this.boss, (bullet, boss) => {
+        if (!bullet || !boss) return; bullet.destroy(); boss.health -= 4; this.playSfx(380, 0.03, 'square', 0.02); if (boss.health <= 0) { boss.destroy(); this.onBossDefeated(); }
+      });
 
-    this.bullets.getChildren().forEach((bullet) => {
-      if (!bullet.active) return;
-      if (bullet.y < -30) bullet.destroy();
-    });
+      // update boss bar
+      this.bossBar.setVisible(true); this.bossBarBg.setVisible(true);
+      const w = 420 * Math.max(0, this.boss.health / this.boss.maxHealth);
+      this.bossBar.width = Math.max(0, w);
+    }
 
-    if (this.enemies.countActive() === 0) {
-      this.wave += 1;
-      this.spawnWave();
+    // other players (multiplayer render)
+    if (this.socket) {
+      // send periodic state
+      if (!this.nextSend || this.nextSend <= 0) { this.socket.emit('state', { x:this.player.x, y:this.player.y, hp:this.player.health }); this.nextSend = 0.06; }
+      this.nextSend -= dt;
     }
 
     this.updateHud();
   }
+
+  onBossDefeated() {
+    this.playSfx(880, 0.15, 'triangle', 0.06);
+    this.player.score += 1500;
+    this.time.delayedCall(800, () => { this.finishGame(true); });
+  }
+
+  onGameOver() { this.gameOver = true; this.physics.pause(); this.add.text(GAME.width/2, GAME.height/2, 'GAME OVER', { fontFamily:'monospace', fontSize:'48px', color:'#ff8aa3' }).setOrigin(0.5); this.time.delayedCall(1800, () => this.scene.start('TitleScene')); }
+
+  finishGame(win) { this.gameOver = true; this.physics.pause(); const title = win ? 'WORLD COMPLETE' : 'GAME OVER'; this.add.text(GAME.width/2, GAME.height/2, title, { fontFamily:'monospace', fontSize:'42px', color: win ? '#9ae6b4' : '#ff8aa3' }).setOrigin(0.5); this.time.delayedCall(1800, () => this.scene.start('TitleScene')); }
+
+  setupNetwork() {
+    try {
+      this.socket = io();
+      this.socket.on('connect', () => console.log('Socket connected', this.socket.id));
+      this.socket.on('welcome', (payload) => console.log('server welcome', payload));
+      this.socket.on('playerState', (state) => {
+        if (!state) return;
+        if (state.id === this.socket.id) return;
+        let op = this.otherPlayers.get(state.id);
+        if (!op) {
+          op = this.add.rectangle(state.x, state.y, 18, 18, 0xffb3f9); this.otherPlayers.set(state.id, op);
+        }
+        op.x = state.x; op.y = state.y;
+      });
+      this.socket.on('pickup', (data) => {
+        // server tells which language was collected — remove visuals if present
+        const code = data.code;
+        this.pickups.getChildren().forEach(p => { if (p.lang.code === code && !p.collected) { p.collected = true; p.destroy(); } });
+      });
+    } catch (e) { console.warn('Socket.IO not available', e); }
+  }
 }
 
-const game = new Phaser.Game({
-  ...config,
-  scene: [BootScene, TitleScene, GameScene],
-});
+
+// register scenes and start
+const game = new Phaser.Game({ ...config, scene: [PreloadScene, TitleScene, PauseScene, GameScene] });
