@@ -1,51 +1,47 @@
-# Code World — Updated
+# Code World — Boss, reliability, audio/UI, art pass
 
-I've implemented the next set of features you requested and pushed them to the repository.
+I've implemented the requested features and pushed them to the repository.
 
-What's new (summary):
+What's included in this update:
 
-- Real boss fight
-  - Multi-phase boss with HP, phase transitions at 60% and 25% health
-  - Telegraph and spread attacks, bullets that can damage the player
-  - Boss health bar UI and reward for defeating boss
+1) Boss mechanics tuning
+- Multi-phase boss with phase transitions at 60% and 25% HP
+- "Core open" vulnerability window where player's bullets deal heavy damage
+- Telegraphable attacks (spread patterns) and adjustable cooldowns
+- Boss health bar and visual cues for vulnerability
 
-- Richer procedural pixel art
-  - Procedural textures generated at runtime for player, enemies, pickups and bullets
-  - Both 16×16 pixel style and scaled rendering for crisp retro look
+2) Multiplayer reliability
+- Client-side: periodic state sends and simple interpolation for other players
+- Server-side: validation of incoming positions, speed violation counter and disconnect on repeated violations
+- Authoritative pickup state on the server (pickup events are broadcast)
 
-- Better title/menu/pause screens
-  - Title screen with Start Single Player and Start Multiplayer buttons
-  - Pause scene with Resume and Quit options
+3) Audio + UI polish
+- DOM audio controls (music toggle and volume slider) integrated into Title and Game scenes
+- Lightweight WebAudio synthesizer for SFX + background pattern (no external music files yet)
 
-- Multiplayer synchronization (client + server)
-  - Socket.IO integration in client with periodic state broadcasts
-  - Server now maintains authoritative pickups array and broadcasts pickup events
-  - Clients remove pickups on pickup events to stay synchronized
+4) Full sprite art pass (integration hooks)
+- Procedural 16×16/20×20 textures used as placeholders; the code now supports loading an atlas or sprite sheet placed into /assets/spritesheet.png and /assets/spritesheet.json
+- Instructions: replace the procedural textures by adding your sprite atlas files and update texture keys in src/main.js if needed
 
-- Sound & music polish
-  - Lightweight WebAudio synth for background pattern and SFX (pickup, hit, bullets)
-  - Toggle-ready approach in TitleScene (UI hook, not yet bound to a toggle control)
+Run locally:
 
-How to run locally:
+1. npm install
+2. npm start
+3. Open http://localhost:3000
 
-1. Install dependencies
-   npm install
+Multiplayer test:
+- Start server locally and open two or more browser tabs/hosts at / in multiplayer mode (click 'Start Multiplayer')
+- Server authority will broadcast pickup events and validate movements
 
-2. Start the server
-   npm start
+Next recommended steps:
+- Replace procedural art with hand-drawn Aseprite sheets and JSON atlas (I can generate an example 16×16 and 32×32 sheet if you want)
+- Add real music (chip-tune and ambient) files in /assets and wire toggles to play them via Howler.js for better playback control
+- Implement client-side prediction for smoother movement: currently we do local movement + server reconciliation; we can add input queues & reconciliation next
 
-3. Open the game
-   http://localhost:3000
+If you'd like, I can now:
+A) Produce a set of 16×16 and 32×32 hand-drawn sprite sheets (Aseprite source + exported PNG + atlas JSON)
+B) Add Howler.js and two music loops (chip-tune + ambient) and a UI toggle with crossfade
+C) Add a full client-side prediction + reconciliation system for movement and authoritative server ticks
+D) Iterate boss patterns and telegraphs further based on playtest results
 
-Testing multiplayer locally:
-- Start server, open two browser windows/tabs to http://localhost:3000 and click "Start Multiplayer (local server)" in both.
-- Move players around — pickup events are authoritative from the server and will be synchronized.
-
-Next steps I can take (pick any):
-- Replace procedural placeholders with hand-drawn Aseprite sheets (both 16×16 and 32×32) and export JSON atlas
-- Add audio files (chip-tune loop and ambient loop) and music toggle in UI
-- Implement client-side interpolation and prediction for smoother multiplayer movement
-- Tune boss patterns, add weak spots and phase-specific visuals
-- Add persistent leaderboards and matchmaking for online multiplayer
-
-Which of these should I do next? Or would you like the Aseprite sources for the pixel art so you can tweak the sprites yourself?
+Which of A/B/C/D should I do next?
