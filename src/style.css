@@ -1,0 +1,21 @@
+body {
+  margin: 0;
+  background: #060b12;
+  color: #e8f6ff;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+#game-root {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.45);
+}

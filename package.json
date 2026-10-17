@@ -1,0 +1,13 @@
+{
+  "name": "code-world",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Code World — Phaser 3 game with pixel-art combat, boss waves, audio, and multiplayer-ready networking.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.8.1"
+  }
+}
